@@ -4,16 +4,37 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>QR 코드 인증 시스템</title>
+    <style>
+        body {
+            text-align: center;
+            font-family: Arial, sans-serif;
+        }
+        video {
+            width: 100%;
+            max-width: 800px; /* 화면 크기 조절 가능 */
+            border: 2px solid black;
+        }
+        #cameraSelect {
+            margin: 10px;
+            padding: 5px;
+            font-size: 16px;
+        }
+    </style>
 </head>
 <body>
     <h1>QR 코드 인증 시스템</h1>
-    <video id="video" width="300" height="200" autoplay></video>
+    
+    <!-- 카메라 선택 -->
+    <label for="cameraSelect">카메라 선택:</label>
+    <select id="cameraSelect"></select>
+
+    <!-- 카메라 화면 -->
+    <video id="video" autoplay></video>
     <canvas id="canvas" hidden></canvas>
     <audio id="audio"></audio>
 
     <script src="https://cdn.jsdelivr.net/npm/jsqr"></script>
     <script>
-        // QR 코드에 따른 MP3 파일 매칭
         const audioFiles = {
             "130525130525": "audio/admin.mp3",  // 관리자
             "740630": "audio/guest.mp3",       // 게스트
@@ -21,23 +42,61 @@
             "150916": "audio/yoon.mp3"         // 임시윤
         };
 
-        // 오디오 플레이어 가져오기
+        const video = document.getElementById("video");
+        const canvas = document.getElementById("canvas");
+        const ctx = canvas.getContext("2d");
         const audioPlayer = document.getElementById("audio");
+        const cameraSelect = document.getElementById("cameraSelect");
 
-        // QR 코드 스캔 함수
-        async function scanQRCode() {
-            const video = document.getElementById("video");
-            const canvas = document.getElementById("canvas");
-            const ctx = canvas.getContext("2d");
+        let currentStream = null;
 
-            // 카메라 접근
-            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+        // 📌 사용 가능한 카메라 목록 가져오기
+        async function getCameras() {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const videoDevices = devices.filter(device => device.kind === "videoinput");
+
+            cameraSelect.innerHTML = ""; // 기존 옵션 삭제
+
+            videoDevices.forEach((device, index) => {
+                const option = document.createElement("option");
+                option.value = device.deviceId;
+                option.text = device.label || `카메라 ${index + 1}`;
+                cameraSelect.appendChild(option);
+            });
+
+            if (videoDevices.length > 0) {
+                startCamera(videoDevices[0].deviceId); // 첫 번째 카메라 기본 선택
+            }
+        }
+
+        // 📌 선택한 카메라 실행
+        async function startCamera(deviceId) {
+            if (currentStream) {
+                currentStream.getTracks().forEach(track => track.stop()); // 기존 스트림 중지
+            }
+
+            const constraints = {
+                video: { 
+                    deviceId: { exact: deviceId }, 
+                    width: { ideal: 1920 }, 
+                    height: { ideal: 1080 } 
+                }
+            };
+
+            const stream = await navigator.mediaDevices.getUserMedia(constraints);
             video.srcObject = stream;
+            currentStream = stream;
+        }
 
+        // 📌 QR 코드 스캔
+        function scanQRCode() {
             setInterval(() => {
+                if (!video.videoWidth) return;
+
                 canvas.width = video.videoWidth;
                 canvas.height = video.videoHeight;
                 ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
                 const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
                 const code = jsQR(imageData.data, imageData.width, imageData.height);
 
@@ -45,7 +104,6 @@
                     const qrData = code.data;
                     console.log("QR 코드 인식됨:", qrData);
 
-                    // QR 코드에 맞는 MP3 파일 재생
                     if (audioFiles[qrData]) {
                         audioPlayer.src = audioFiles[qrData];
                         audioPlayer.play();
@@ -56,6 +114,13 @@
             }, 1000);
         }
 
+        // 📌 이벤트 리스너 추가
+        cameraSelect.addEventListener("change", (event) => {
+            startCamera(event.target.value);
+        });
+
+        // 📌 실행
+        getCameras();
         scanQRCode();
     </script>
 </body>
