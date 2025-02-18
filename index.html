@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR 코드 인증 시스템</title>
+</head>
+<body>
+    <h1>QR 코드 인증 시스템</h1>
+    <video id="video" width="300" height="200" autoplay></video>
+    <canvas id="canvas" hidden></canvas>
+    <audio id="audio"></audio>
+
+    <script src="https://cdn.jsdelivr.net/npm/jsqr"></script>
+    <script>
+        // QR 코드에 따른 MP3 파일 매칭
+        const audioFiles = {
+            "130525130525": "audio/admin.mp3",  // 관리자
+            "740630": "audio/guest.mp3",       // 게스트
+            "800215": "audio/mom.mp3",         // 엄마
+            "150916": "audio/yoon.mp3"         // 임시윤
+        };
+
+        // 오디오 플레이어 가져오기
+        const audioPlayer = document.getElementById("audio");
+
+        // QR 코드 스캔 함수
+        async function scanQRCode() {
+            const video = document.getElementById("video");
+            const canvas = document.getElementById("canvas");
+            const ctx = canvas.getContext("2d");
+
+            // 카메라 접근
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+            video.srcObject = stream;
+
+            setInterval(() => {
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const code = jsQR(imageData.data, imageData.width, imageData.height);
+
+                if (code) {
+                    const qrData = code.data;
+                    console.log("QR 코드 인식됨:", qrData);
+
+                    // QR 코드에 맞는 MP3 파일 재생
+                    if (audioFiles[qrData]) {
+                        audioPlayer.src = audioFiles[qrData];
+                        audioPlayer.play();
+                    } else {
+                        alert("등록되지 않은 QR 코드입니다.");
+                    }
+                }
+            }, 1000);
+        }
+
+        scanQRCode();
+    </script>
+</body>
+</html>
